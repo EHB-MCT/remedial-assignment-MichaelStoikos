@@ -1,58 +1,245 @@
+/* Reset and base styles */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+  color: #ffffff;
+  min-height: 100vh;
+}
+
 .app {
-  max-width: 800px;
-  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Authentication Styles */
+.auth-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
   padding: 2rem;
+}
+
+.auth-card {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 2px solid #4a90e2;
+  border-radius: 16px;
+  padding: 2.5rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(45deg, #4a90e2, #7b68ee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.auth-header p {
+  color: #b0b0b0;
+  font-size: 1rem;
+}
+
+.auth-tabs {
+  display: flex;
+  margin-bottom: 2rem;
+  background: rgba(74, 144, 226, 0.1);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.tab {
+  flex: 1;
+  padding: 0.8rem;
+  background: none;
+  border: none;
+  color: #b0b0b0;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.tab.active {
+  background: #4a90e2;
+  color: white;
+}
+
+.tab:hover:not(.active) {
+  background: rgba(74, 144, 226, 0.2);
+  color: #e0e0e0;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  color: #e0e0e0;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.form-group input {
+  padding: 0.8rem;
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  border-radius: 8px;
+  background: rgba(74, 144, 226, 0.1);
+  color: #ffffff;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  background: rgba(74, 144, 226, 0.2);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.form-group input::placeholder {
+  color: #888;
+}
+
+.error-message {
+  background: rgba(244, 67, 54, 0.1);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  border-radius: 8px;
+  padding: 0.8rem;
+  color: #f44336;
+  font-size: 0.9rem;
   text-align: center;
 }
 
-header {
-  margin-bottom: 2rem;
+.submit-btn {
+  padding: 1rem;
+  background: linear-gradient(45deg, #4a90e2, #7b68ee);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-weight: bold;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
-header h1 {
-  font-size: 2.5rem;
-  color: #4a90e2;
-  margin-bottom: 0.5rem;
+.submit-btn:hover:not(:disabled) {
+  background: linear-gradient(45deg, #357abd, #6a5acd);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(74, 144, 226, 0.3);
 }
 
-header p {
-  color: #666;
-  font-size: 1.1rem;
+.submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
-.status-panel {
-  background: #f5f5f5;
+/* Game Interface Styles */
+.game-header {
+  background: linear-gradient(90deg, #1a1a2e 0%, #16213e 100%);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid #4a90e2;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.game-header h1 {
+  font-size: 2rem;
+  background: linear-gradient(45deg, #4a90e2, #7b68ee);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.game-header p {
+  color: #b0b0b0;
+}
+
+.logout-btn {
+  padding: 0.5rem 1rem;
+  background: rgba(244, 67, 54, 0.2);
+  border: 1px solid rgba(244, 67, 54, 0.4);
+  border-radius: 6px;
+  color: #f44336;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+  background: rgba(244, 67, 54, 0.3);
+  border-color: #f44336;
+}
+
+.game-main {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+}
+
+.game-content {
+  text-align: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   border: 2px solid #4a90e2;
   border-radius: 12px;
   padding: 2rem;
-  margin-bottom: 2rem;
+  max-width: 600px;
 }
 
-.status-panel h2 {
-  color: #333;
+.game-content h2 {
+  color: #4a90e2;
   margin-bottom: 1rem;
 }
 
-.status-panel p {
-  color: #666;
+.game-content p {
+  color: #b0b0b0;
   margin-bottom: 0.5rem;
 }
 
-.game-data {
-  background: #e8f4fd;
-  border: 1px solid #4a90e2;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-top: 1rem;
-  text-align: left;
-}
-
-.game-data h3 {
-  color: #4a90e2;
-  margin-bottom: 0.5rem;
-}
-
-.game-data p {
-  margin-bottom: 0.3rem;
-  font-family: monospace;
+/* Responsive Design */
+@media (max-width: 768px) {
+  .auth-card {
+    padding: 2rem;
+    margin: 1rem;
+  }
+  
+  .game-header {
+    flex-direction: column;
+    gap: 1rem;
+    text-align: center;
+  }
+  
+  .game-header h1 {
+    font-size: 1.5rem;
+  }
 }

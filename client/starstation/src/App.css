@@ -172,6 +172,37 @@ body {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
+.game-nav {
+  background: linear-gradient(90deg, #16213e 0%, #1a1a2e 100%);
+  padding: 0 2rem;
+  border-bottom: 1px solid rgba(74, 144, 226, 0.3);
+  display: flex;
+  gap: 0.5rem;
+}
+
+.nav-tab {
+  padding: 1rem 1.5rem;
+  color: #b0b0b0;
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.nav-tab:hover {
+  color: #e0e0e0;
+  background: rgba(74, 144, 226, 0.1);
+}
+
+.nav-tab.active {
+  color: #4a90e2;
+  border-bottom-color: #4a90e2;
+  background: rgba(74, 144, 226, 0.1);
+}
+
 .game-header h1 {
   font-size: 2rem;
   background: linear-gradient(45deg, #4a90e2, #7b68ee);

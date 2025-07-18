@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import './App.css'
+import ResourceDisplay from './components/resources/ResourceDisplay'
+import BuildingsTab from './components/buildings/BuildingsTab'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true)
@@ -62,20 +65,9 @@ function App() {
   // If user is logged in, show game interface
   if (user) {
     return (
-      <div className="app">
-        <header className="game-header">
-          <h1>🚀 StarStation</h1>
-          <p>Welcome, {user.username}!</p>
-          <button onClick={handleLogout} className="logout-btn">Logout</button>
-        </header>
-        <main className="game-main">
-          <div className="game-content">
-            <h2>🎮 Game Interface Coming Soon!</h2>
-            <p>Your game will be built here. You're logged in as: {user.username}</p>
-            <p>User ID: {user.userId}</p>
-          </div>
-        </main>
-      </div>
+      <Router>
+        <GameInterface user={user} onLogout={handleLogout} />
+      </Router>
     )
   }
 
@@ -144,5 +136,54 @@ function App() {
     </div>
   )
 }
+
+// Game Interface Component with Navigation
+const GameInterface = ({ user, onLogout }) => {
+  const location = useLocation();
+
+  return (
+    <div className="app">
+      <header className="game-header">
+        <h1>🚀 StarStation</h1>
+        <p>Welcome, {user.username}!</p>
+        <button onClick={onLogout} className="logout-btn">Logout</button>
+      </header>
+      
+      <nav className="game-nav">
+        <Link 
+          to="/" 
+          className={`nav-tab ${location.pathname === '/' ? 'active' : ''}`}
+        >
+          📊 Resources
+        </Link>
+        <Link 
+          to="/buildings" 
+          className={`nav-tab ${location.pathname === '/buildings' ? 'active' : ''}`}
+        >
+          🏗️ Buildings
+        </Link>
+      </nav>
+
+      <main className="game-main">
+        <Routes>
+          <Route 
+            path="/" 
+            element={
+              <div className="game-content">
+                <h2>🌌 Space Colony Resource Management</h2>
+                <p>Manage your resources and expand your colony!</p>
+                <ResourceDisplay userId={user.userId} />
+              </div>
+            } 
+          />
+          <Route 
+            path="/buildings" 
+            element={<BuildingsTab userId={user.userId} />} 
+          />
+        </Routes>
+      </main>
+    </div>
+  );
+};
 
 export default App

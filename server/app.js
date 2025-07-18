@@ -1,7 +1,7 @@
 // server/app.js
 import express from 'express';
 import cors from 'cors';
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 
@@ -14,6 +14,11 @@ const url = process.env.MONGODB_URI;
 const dbName = 'Resource-Management-Web';
 
 const client = new MongoClient(url);
+
+// Connect to MongoDB once when server starts
+client.connect()
+  .then(() => console.log('✅ Connected to MongoDB'))
+  .catch(err => console.error('❌ MongoDB connection error:', err));
 
 app.use(cors());
 app.use(express.json());
@@ -38,7 +43,6 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    await client.connect();
     const db = client.db(dbName);
     const usersCollection = db.collection('users');
     
@@ -62,12 +66,20 @@ app.post('/api/auth/register', async (req, res) => {
     const gameState = {
       userId: result.insertedId,
       resources: {
-        energy: 100,
-        minerals: 50,
-        food: 30,
-        credits: 200
+        oxygen: 100,
+        food: 50,
+        water: 80,
+        energy: 30,
+        metal: 20
       },
-      buildings: [],
+      buildings: [
+        {
+          type: 'habitat',
+          level: 1,
+          lastHarvest: new Date(),
+          position: { x: 5, y: 5 }
+        }
+      ],
       createdAt: new Date()
     };
 
@@ -79,8 +91,6 @@ app.post('/api/auth/register', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
-  } finally {
-    await client.close();
   }
 });
 
@@ -93,7 +103,6 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    await client.connect();
     const db = client.db(dbName);
     const usersCollection = db.collection('users');
     
@@ -116,8 +125,6 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
-  } finally {
-    await client.close();
   }
 });
 
@@ -126,48 +133,138 @@ app.get('/api/game/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     
-    await client.connect();
     const db = client.db(dbName);
     const gamesCollection = db.collection('games');
     
-    let gameState = await gamesCollection.findOne({ userId: new MongoClient.ObjectId(userId) });
+    let gameState = await gamesCollection.findOne({ userId: new ObjectId(userId) });
     
     if (!gameState) {
       // Create new game state if it doesn't exist
       gameState = {
-        userId: new MongoClient.ObjectId(userId),
+        userId: new ObjectId(userId),
         resources: {
-          energy: 100,
-          minerals: 50,
-          food: 30,
-          credits: 200
+          oxygen: 100,
+          food: 50,
+          water: 80,
+          energy: 30,
+          metal: 20
         },
-        buildings: [],
+        buildings: [
+          {
+            type: 'habitat',
+            level: 1,
+            lastHarvest: new Date(),
+            position: { x: 5, y: 5 }
+        }
+        ],
         createdAt: new Date()
       };
       
       await gamesCollection.insertOne(gameState);
     }
+
+    // Calculate stocked resources (what's available to harvest)
+    const now = Date.now();
+    let stockedResources = { oxygen: 0, food: 0, water: 0, energy: 0, metal: 0 };
+
+    if (gameState.buildings && Array.isArray(gameState.buildings)) {
+      gameState.buildings.forEach(building => {
+        const timeDiff = now - new Date(building.lastHarvest).getTime();
+        const minutesPassed = Math.floor(timeDiff / (1000 * 60));
+        
+        if (building.type === 'habitat') {
+          const oxygenPer30Sec = 5 * building.level; // 5 oxygen per 30 seconds for testing
+          const oxygenStocked = Math.floor(minutesPassed * 2) * oxygenPer30Sec; // 2 intervals per minute (30 seconds each)
+          stockedResources.oxygen += oxygenStocked;
+        }
+      });
+    }
+
+    // Add stocked resources to the response
+    const responseData = {
+      ...gameState,
+      stockedResources
+    };
     
-    res.json(gameState);
+    res.json(responseData);
   } catch (error) {
     res.status(500).json({ error: error.message });
-  } finally {
-    await client.close();
+  }
+});
+
+// Harvest resources from buildings
+app.post('/api/game/:userId/harvest', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const db = client.db(dbName);
+    const gamesCollection = db.collection('games');
+    
+    // Try to find game state with ObjectId first, then with string
+    let gameState = await gamesCollection.findOne({ userId: new ObjectId(userId) });
+    
+    if (!gameState) {
+      // Try with string userId as fallback
+      gameState = await gamesCollection.findOne({ userId: userId });
+    }
+    
+    if (!gameState) {
+      return res.status(404).json({ error: 'Game state not found' });
+    }
+
+    const now = Date.now();
+    let totalHarvest = { oxygen: 0, food: 0, water: 0, energy: 0, metal: 0 };
+
+    // Calculate resources from each building
+    if (gameState.buildings && Array.isArray(gameState.buildings)) {
+      gameState.buildings.forEach(building => {
+        const timeDiff = now - new Date(building.lastHarvest).getTime();
+        const minutesPassed = Math.floor(timeDiff / (1000 * 60));
+        
+        if (building.type === 'habitat') {
+          const oxygenPer30Sec = 5 * building.level; // 5 oxygen per 30 seconds for testing
+          const oxygenHarvested = Math.floor(minutesPassed * 2) * oxygenPer30Sec; // 2 intervals per minute (30 seconds each)
+          totalHarvest.oxygen += oxygenHarvested;
+          
+          if (oxygenHarvested > 0) {
+            building.lastHarvest = new Date();
+          }
+        }
+      });
+    }
+
+    // Update resources
+    Object.keys(totalHarvest).forEach(resource => {
+      if (gameState.resources && gameState.resources[resource] !== undefined) {
+        gameState.resources[resource] += totalHarvest[resource];
+      }
+    });
+
+    // Save updated game state
+    await gamesCollection.updateOne(
+      { _id: gameState._id },
+      { $set: gameState }
+    );
+
+    res.json({ 
+      gameState, 
+      harvested: totalHarvest,
+      message: 'Resources harvested successfully'
+    });
+  } catch (error) {
+    console.error('Harvest error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
 // Get all tests (keeping existing endpoint)
 app.get('/api/tests', async (req, res) => {
   try {
-    await client.connect();
     const db = client.db(dbName);
     const tests = await db.collection('tests').find({}).toArray();
     res.json(tests);
   } catch (error) {
     res.status(500).json({ error: error.message });
-  } finally {
-    await client.close();
   }
 });
 

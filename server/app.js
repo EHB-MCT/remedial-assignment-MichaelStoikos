@@ -168,16 +168,33 @@ app.get('/api/game/:userId', async (req, res) => {
     let stockedResources = { oxygen: 0, food: 0, water: 0, energy: 0, metal: 0 };
 
     if (gameState.buildings && Array.isArray(gameState.buildings)) {
-      gameState.buildings.forEach(building => {
+      const buildingsCollection = db.collection('buildings');
+      
+      for (const building of gameState.buildings) {
+        const buildingDefinition = await buildingsCollection.findOne({ type: building.type });
+        if (!buildingDefinition) continue;
+        
         const timeDiff = now - new Date(building.lastHarvest).getTime();
         const minutesPassed = Math.floor(timeDiff / (1000 * 60));
         
-        if (building.type === 'habitat') {
-          const oxygenPer30Sec = 5 * building.level; // 5 oxygen per 30 seconds for testing
-          const oxygenStocked = Math.floor(minutesPassed * 2) * oxygenPer30Sec; // 2 intervals per minute (30 seconds each)
-          stockedResources.oxygen += oxygenStocked;
-        }
-      });
+        // Calculate stocked resources based on building definition
+        Object.entries(buildingDefinition.production).forEach(([resource, baseAmount]) => {
+          if (baseAmount > 0) {
+            let stocked = 0;
+            
+            if (buildingDefinition.productionRate === 30) {
+              // 30-second production rate (like habitat)
+              const intervalsPerMinute = 2;
+              stocked = Math.floor(minutesPassed * intervalsPerMinute) * baseAmount * building.level;
+            } else {
+              // 60-second production rate (like other buildings)
+              stocked = minutesPassed * baseAmount * building.level;
+            }
+            
+            stockedResources[resource] += stocked;
+          }
+        });
+      }
     }
 
     // Add stocked resources to the response
@@ -217,20 +234,36 @@ app.post('/api/game/:userId/harvest', async (req, res) => {
 
     // Calculate resources from each building
     if (gameState.buildings && Array.isArray(gameState.buildings)) {
-      gameState.buildings.forEach(building => {
+      const buildingsCollection = db.collection('buildings');
+      
+      for (const building of gameState.buildings) {
+        const buildingDefinition = await buildingsCollection.findOne({ type: building.type });
+        if (!buildingDefinition) continue;
+        
         const timeDiff = now - new Date(building.lastHarvest).getTime();
         const minutesPassed = Math.floor(timeDiff / (1000 * 60));
         
-        if (building.type === 'habitat') {
-          const oxygenPer30Sec = 5 * building.level; // 5 oxygen per 30 seconds for testing
-          const oxygenHarvested = Math.floor(minutesPassed * 2) * oxygenPer30Sec; // 2 intervals per minute (30 seconds each)
-          totalHarvest.oxygen += oxygenHarvested;
-          
-          if (oxygenHarvested > 0) {
-            building.lastHarvest = new Date();
+        // Calculate production based on building definition
+        Object.entries(buildingDefinition.production).forEach(([resource, baseAmount]) => {
+          if (baseAmount > 0) {
+            let harvested = 0;
+            
+            if (buildingDefinition.productionRate === 30) {
+              // 30-second production rate (like habitat)
+              const intervalsPerMinute = 2;
+              harvested = Math.floor(minutesPassed * intervalsPerMinute) * baseAmount * building.level;
+            } else {
+              // 60-second production rate (like other buildings)
+              harvested = minutesPassed * baseAmount * building.level;
+            }
+            
+            if (harvested > 0) {
+              totalHarvest[resource] += harvested;
+              building.lastHarvest = new Date();
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     // Update resources
@@ -253,6 +286,183 @@ app.post('/api/game/:userId/harvest', async (req, res) => {
     });
   } catch (error) {
     console.error('Harvest error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Build a new building
+app.post('/api/game/:userId/build', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { buildingType } = req.body;
+    
+    if (!buildingType) {
+      return res.status(400).json({ error: 'Building type is required' });
+    }
+
+    const db = client.db(dbName);
+    const gamesCollection = db.collection('games');
+    
+    // Try to find game state with ObjectId first, then with string
+    let gameState = await gamesCollection.findOne({ userId: new ObjectId(userId) });
+    
+    if (!gameState) {
+      // Try with string userId as fallback
+      gameState = await gamesCollection.findOne({ userId: userId });
+    }
+    
+    if (!gameState) {
+      return res.status(404).json({ error: 'Game state not found' });
+    }
+
+    // Get building definition from database
+    const buildingsCollection = db.collection('buildings');
+    const buildingDefinition = await buildingsCollection.findOne({ type: buildingType });
+    
+    if (!buildingDefinition) {
+      return res.status(400).json({ error: 'Invalid building type' });
+    }
+
+    const buildingCost = buildingDefinition.cost;
+
+    // Check if player has enough resources
+    const canAfford = Object.keys(buildingCost).every(resource => 
+      gameState.resources[resource] >= buildingCost[resource]
+    );
+
+    if (!canAfford) {
+      return res.status(400).json({ error: 'Insufficient resources to build this structure' });
+    }
+
+    // Deduct resources
+    Object.keys(buildingCost).forEach(resource => {
+      gameState.resources[resource] -= buildingCost[resource];
+    });
+
+    // Add the new building
+    const newBuilding = {
+      type: buildingType,
+      level: 1,
+      lastHarvest: new Date(),
+      position: { x: Math.floor(Math.random() * 10), y: Math.floor(Math.random() * 10) }
+    };
+
+    if (!gameState.buildings) {
+      gameState.buildings = [];
+    }
+    gameState.buildings.push(newBuilding);
+
+    // Save updated game state
+    await gamesCollection.updateOne(
+      { _id: gameState._id },
+      { $set: gameState }
+    );
+
+    res.json({ 
+      gameState,
+      message: `Successfully built ${buildingType}!`,
+      newBuilding
+    });
+  } catch (error) {
+    console.error('Build error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Initialize buildings in database (run once)
+app.post('/api/init-buildings', async (req, res) => {
+  try {
+    const db = client.db(dbName);
+    const buildingsCollection = db.collection('buildings');
+    
+    // Check if buildings already exist
+    const existingBuildings = await buildingsCollection.find({}).toArray();
+    if (existingBuildings.length > 0) {
+      return res.json({ message: 'Buildings already initialized' });
+    }
+    
+    const buildingTypes = [
+      {
+        type: 'habitat',
+        name: 'Basic Habitat',
+        icon: '🏠',
+        description: 'Produces oxygen for your colony',
+        cost: { oxygen: 0, food: 0, water: 0, energy: 0, metal: 0 },
+        production: { oxygen: 5, food: 0, water: 0, energy: 0, metal: 0 },
+        productionRate: 30, // seconds
+        unlocked: true,
+        maxLevel: 10,
+        upgradeCostMultiplier: 1.5
+      },
+      {
+        type: 'farm',
+        name: 'Hydroponic Farm',
+        icon: '🌾',
+        description: 'Grows food in controlled environments',
+        cost: { oxygen: 20, food: 0, water: 30, energy: 10, metal: 15 },
+        production: { oxygen: 0, food: 3, water: 0, energy: 0, metal: 0 },
+        productionRate: 60, // seconds
+        unlocked: true,
+        maxLevel: 10,
+        upgradeCostMultiplier: 1.5
+      },
+      {
+        type: 'water',
+        name: 'Water Purifier',
+        icon: '💧',
+        description: 'Purifies and produces clean water',
+        cost: { oxygen: 15, food: 0, water: 0, energy: 25, metal: 20 },
+        production: { oxygen: 0, food: 0, water: 4, energy: 0, metal: 0 },
+        productionRate: 60, // seconds
+        unlocked: true,
+        maxLevel: 10,
+        upgradeCostMultiplier: 1.5
+      },
+      {
+        type: 'generator',
+        name: 'Solar Generator',
+        icon: '⚡',
+        description: 'Generates energy from solar radiation',
+        cost: { oxygen: 10, food: 0, water: 0, energy: 0, metal: 30 },
+        production: { oxygen: 0, food: 0, water: 0, energy: 6, metal: 0 },
+        productionRate: 60, // seconds
+        unlocked: true,
+        maxLevel: 10,
+        upgradeCostMultiplier: 1.5
+      },
+      {
+        type: 'mine',
+        name: 'Metal Mine',
+        icon: '⛏️',
+        description: 'Extracts metal from the planet surface',
+        cost: { oxygen: 25, food: 10, water: 15, energy: 20, metal: 0 },
+        production: { oxygen: 0, food: 0, water: 0, energy: 0, metal: 2 },
+        productionRate: 60, // seconds
+        unlocked: true,
+        maxLevel: 10,
+        upgradeCostMultiplier: 1.5
+      }
+    ];
+    
+    const result = await buildingsCollection.insertMany(buildingTypes);
+    res.json({ 
+      message: 'Buildings initialized successfully',
+      insertedCount: result.insertedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all building types and their definitions
+app.get('/api/buildings', async (req, res) => {
+  try {
+    const db = client.db(dbName);
+    const buildingsCollection = db.collection('buildings');
+    
+    const buildingTypes = await buildingsCollection.find({}).toArray();
+    res.json(buildingTypes);
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

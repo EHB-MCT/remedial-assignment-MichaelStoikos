@@ -140,6 +140,7 @@ function App() {
 // Game Interface Component with Navigation
 const GameInterface = ({ user, onLogout }) => {
   const location = useLocation();
+  const [resourceRefresh, setResourceRefresh] = useState(null);
 
   return (
     <div className="app">
@@ -172,13 +173,22 @@ const GameInterface = ({ user, onLogout }) => {
               <div className="game-content">
                 <h2>🌌 Space Colony Resource Management</h2>
                 <p>Manage your resources and expand your colony!</p>
-                <ResourceDisplay userId={user.userId} />
+                <ResourceDisplay userId={user.userId} onRef={setResourceRefresh} />
               </div>
             } 
           />
           <Route 
             path="/buildings" 
-            element={<BuildingsTab userId={user.userId} />} 
+            element={
+              <BuildingsTab 
+                userId={user.userId} 
+                onResourcesUpdate={() => {
+                  if (resourceRefresh) {
+                    resourceRefresh.refresh();
+                  }
+                }}
+              />
+            } 
           />
         </Routes>
       </main>

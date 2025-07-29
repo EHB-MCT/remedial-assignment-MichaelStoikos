@@ -4,6 +4,7 @@ import axios from 'axios'
 import './App.css'
 import ResourceDisplay from './components/resources/ResourceDisplay'
 import BuildingsTab from './components/buildings/BuildingsTab'
+import EventsDisplay from './components/events/EventsDisplay'
 
 function App() {
   const [isLogin, setIsLogin] = useState(true)
@@ -163,6 +164,12 @@ const GameInterface = ({ user, onLogout }) => {
         >
           🏗️ Buildings
         </Link>
+        <Link 
+          to="/events" 
+          className={`nav-tab ${location.pathname === '/events' ? 'active' : ''}`}
+        >
+          🌌 Events
+        </Link>
       </nav>
 
       <main className="game-main">
@@ -188,6 +195,23 @@ const GameInterface = ({ user, onLogout }) => {
                   }
                 }}
               />
+            } 
+          />
+          <Route 
+            path="/events" 
+            element={
+              <div className="game-content">
+                <h2>🌌 Space Events</h2>
+                <p>Experience dynamic space phenomena that affect your colony!</p>
+                <EventsDisplay 
+                  userId={user.userId} 
+                  onEventTriggered={() => {
+                    if (resourceRefresh) {
+                      resourceRefresh.refresh();
+                    }
+                  }}
+                />
+              </div>
             } 
           />
         </Routes>

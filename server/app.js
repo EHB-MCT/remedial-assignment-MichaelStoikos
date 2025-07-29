@@ -80,6 +80,7 @@ app.post('/api/auth/register', async (req, res) => {
           position: { x: 5, y: 5 }
         }
       ],
+      lastEventOccurrence: {}, // Initialize empty event occurrence tracking
       createdAt: new Date()
     };
 
@@ -157,6 +158,7 @@ app.get('/api/game/:userId', async (req, res) => {
             position: { x: 5, y: 5 }
         }
         ],
+        lastEventOccurrence: {}, // Initialize empty event occurrence tracking
         createdAt: new Date()
       };
       
@@ -170,6 +172,12 @@ app.get('/api/game/:userId', async (req, res) => {
     if (gameState.buildings && Array.isArray(gameState.buildings)) {
       const buildingsCollection = db.collection('buildings');
       
+      // Check for active space event
+      let productionModifiers = { oxygen: 1.0, food: 1.0, water: 1.0, energy: 1.0, metal: 1.0 };
+      if (gameState.activeEvent && gameState.activeEvent.endTime > now) {
+        productionModifiers = { ...productionModifiers, ...gameState.activeEvent.effects.productionModifiers };
+      }
+      
       for (const building of gameState.buildings) {
         const buildingDefinition = await buildingsCollection.findOne({ type: building.type });
         if (!buildingDefinition) continue;
@@ -177,7 +185,7 @@ app.get('/api/game/:userId', async (req, res) => {
         const timeDiff = now - new Date(building.lastHarvest).getTime();
         const minutesPassed = Math.floor(timeDiff / (1000 * 60));
         
-        // Calculate stocked resources based on building definition
+        // Calculate stocked resources based on building definition and active events
         Object.entries(buildingDefinition.production).forEach(([resource, baseAmount]) => {
           if (baseAmount > 0) {
             let stocked = 0;
@@ -190,6 +198,9 @@ app.get('/api/game/:userId', async (req, res) => {
               // 60-second production rate (like other buildings)
               stocked = minutesPassed * baseAmount * building.level;
             }
+            
+            // Apply event modifiers
+            stocked = Math.floor(stocked * productionModifiers[resource]);
             
             stockedResources[resource] += stocked;
           }
@@ -236,6 +247,12 @@ app.post('/api/game/:userId/harvest', async (req, res) => {
     if (gameState.buildings && Array.isArray(gameState.buildings)) {
       const buildingsCollection = db.collection('buildings');
       
+      // Check for active space event
+      let productionModifiers = { oxygen: 1.0, food: 1.0, water: 1.0, energy: 1.0, metal: 1.0 };
+      if (gameState.activeEvent && gameState.activeEvent.endTime > now) {
+        productionModifiers = { ...productionModifiers, ...gameState.activeEvent.effects.productionModifiers };
+      }
+      
       for (const building of gameState.buildings) {
         const buildingDefinition = await buildingsCollection.findOne({ type: building.type });
         if (!buildingDefinition) continue;
@@ -243,7 +260,7 @@ app.post('/api/game/:userId/harvest', async (req, res) => {
         const timeDiff = now - new Date(building.lastHarvest).getTime();
         const minutesPassed = Math.floor(timeDiff / (1000 * 60));
         
-        // Calculate production based on building definition
+        // Calculate production based on building definition and active events
         Object.entries(buildingDefinition.production).forEach(([resource, baseAmount]) => {
           if (baseAmount > 0) {
             let harvested = 0;
@@ -256,6 +273,9 @@ app.post('/api/game/:userId/harvest', async (req, res) => {
               // 60-second production rate (like other buildings)
               harvested = minutesPassed * baseAmount * building.level;
             }
+            
+            // Apply event modifiers
+            harvested = Math.floor(harvested * productionModifiers[resource]);
             
             if (harvested > 0) {
               totalHarvest[resource] += harvested;
@@ -466,6 +486,237 @@ app.get('/api/buildings', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Initialize space events collection with predefined events
+app.post('/api/init-events', async (req, res) => {
+  try {
+    const db = client.db(dbName);
+    const eventsCollection = db.collection('spaceEvents');
+    
+    // Clear existing events
+    await eventsCollection.deleteMany({});
+    
+    const eventTypes = [
+      {
+        type: 'solar_eclipse',
+        name: 'Solar Eclipse',
+        icon: '🌑',
+        description: 'A solar eclipse blocks sunlight, reducing energy production',
+        duration: 300000, // 5 minutes in milliseconds
+        effects: {
+          productionModifiers: { energy: 0.5 }, // 50% reduction
+          message: 'Solar eclipse detected! Energy production reduced by 50% for 5 minutes.'
+        },
+        rarity: 'common',
+        cooldown: 600000 // 10 minutes between occurrences
+      },
+      {
+        type: 'meteor_shower',
+        name: 'Meteor Shower',
+        icon: '☄️',
+        description: 'Meteor shower provides extra metal resources',
+        duration: 180000, // 3 minutes in milliseconds
+        effects: {
+          productionModifiers: { metal: 2.0 }, // 200% boost
+          message: 'Meteor shower detected! Metal production doubled for 3 minutes.'
+        },
+        rarity: 'uncommon',
+        cooldown: 900000 // 15 minutes between occurrences
+      },
+      {
+        type: 'cosmic_radiation',
+        name: 'Cosmic Radiation',
+        icon: '☢️',
+        description: 'High cosmic radiation boosts all production temporarily',
+        duration: 240000, // 4 minutes in milliseconds
+        effects: {
+          productionModifiers: { 
+            oxygen: 1.5, 
+            food: 1.5, 
+            water: 1.5, 
+            energy: 1.5, 
+            metal: 1.5 
+          }, // 50% boost to all
+          message: 'Cosmic radiation surge! All production increased by 50% for 4 minutes.'
+        },
+        rarity: 'rare',
+        cooldown: 1200000 // 20 minutes between occurrences
+      },
+      {
+        type: 'solar_flare',
+        name: 'Solar Flare',
+        icon: '🔥',
+        description: 'Solar flare disrupts all production temporarily',
+        duration: 120000, // 2 minutes in milliseconds
+        effects: {
+          productionModifiers: { 
+            oxygen: 0.3, 
+            food: 0.3, 
+            water: 0.3, 
+            energy: 0.3, 
+            metal: 0.3 
+          }, // 70% reduction to all
+          message: 'Solar flare detected! All production reduced by 70% for 2 minutes.'
+        },
+        rarity: 'rare',
+        cooldown: 1800000 // 30 minutes between occurrences
+      },
+      {
+        type: 'nebula_passage',
+        name: 'Nebula Passage',
+        icon: '🌌',
+        description: 'Passing through a nebula enhances oxygen production',
+        duration: 360000, // 6 minutes in milliseconds
+        effects: {
+          productionModifiers: { oxygen: 3.0 }, // 300% boost
+          message: 'Nebula passage detected! Oxygen production tripled for 6 minutes.'
+        },
+        rarity: 'uncommon',
+        cooldown: 900000 // 15 minutes between occurrences
+      }
+    ];
+    
+    const result = await eventsCollection.insertMany(eventTypes);
+    res.json({ 
+      message: 'Space events initialized successfully',
+      insertedCount: result.insertedCount
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all space event types
+app.get('/api/events', async (req, res) => {
+  try {
+    const db = client.db(dbName);
+    const eventsCollection = db.collection('spaceEvents');
+    
+    const eventTypes = await eventsCollection.find({}).toArray();
+    res.json(eventTypes);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Trigger a random space event for a user
+app.post('/api/game/:userId/trigger-event', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const db = client.db(dbName);
+    const gamesCollection = db.collection('games');
+    const eventsCollection = db.collection('spaceEvents');
+    
+    let gameState = await gamesCollection.findOne({ userId: new ObjectId(userId) });
+    if (!gameState) {
+      gameState = await gamesCollection.findOne({ userId: userId });
+    }
+    if (!gameState) {
+      return res.status(404).json({ error: 'Game state not found' });
+    }
+    
+    // Get all available events
+    const availableEvents = await eventsCollection.find({}).toArray();
+    
+    // Check cooldowns and select a random event
+    const now = Date.now();
+    const eligibleEvents = availableEvents.filter(event => {
+      const lastOccurrence = gameState.lastEventOccurrence?.[event.type] || 0;
+      // If lastOccurrence is 0, it means the event has never been triggered
+      // So it should be eligible (no cooldown for new events)
+      if (lastOccurrence === 0) return true;
+      return (now - lastOccurrence) >= event.cooldown;
+    });
+    
+    if (eligibleEvents.length === 0) {
+      // Calculate when the next event will be available
+      const nextEventTimes = availableEvents.map(e => {
+        const lastOccurrence = gameState.lastEventOccurrence?.[e.type] || 0;
+        if (lastOccurrence === 0) return 0; // Event never triggered, available now
+        return Math.max(0, e.cooldown - (now - lastOccurrence));
+      });
+      
+      const nextEventIn = Math.min(...nextEventTimes.filter(time => time > 0));
+      
+      return res.json({ 
+        message: 'No events available at this time',
+        nextEventIn: nextEventIn || 0,
+        debug: {
+          totalEvents: availableEvents.length,
+          eligibleEvents: eligibleEvents.length,
+          lastEventOccurrence: gameState.lastEventOccurrence || 'none'
+        }
+      });
+    }
+    
+    // Select random event based on rarity
+    const selectedEvent = selectRandomEvent(eligibleEvents);
+    
+    // Apply event effects
+    const eventStart = new Date();
+    const eventEnd = new Date(eventStart.getTime() + selectedEvent.duration);
+    
+    const activeEvent = {
+      type: selectedEvent.type,
+      name: selectedEvent.name,
+      icon: selectedEvent.icon,
+      description: selectedEvent.description,
+      effects: selectedEvent.effects,
+      startTime: eventStart,
+      endTime: eventEnd,
+      duration: selectedEvent.duration
+    };
+    
+    // Update game state with active event
+    const updateData = {
+      activeEvent: activeEvent,
+      lastEventOccurrence: {
+        ...gameState.lastEventOccurrence,
+        [selectedEvent.type]: now
+      }
+    };
+    
+    await gamesCollection.updateOne(
+      { _id: gameState._id },
+      { $set: updateData }
+    );
+    
+    res.json({
+      message: 'Space event triggered successfully',
+      event: activeEvent
+    });
+    
+  } catch (error) {
+    console.error('Trigger event error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Helper function to select random event based on rarity
+function selectRandomEvent(events) {
+  const rarityWeights = {
+    'common': 0.5,
+    'uncommon': 0.3,
+    'rare': 0.2
+  };
+  
+  const weightedEvents = events.map(event => ({
+    ...event,
+    weight: rarityWeights[event.rarity] || 0.1
+  }));
+  
+  const totalWeight = weightedEvents.reduce((sum, event) => sum + event.weight, 0);
+  let random = Math.random() * totalWeight;
+  
+  for (const event of weightedEvents) {
+    random -= event.weight;
+    if (random <= 0) {
+      return event;
+    }
+  }
+  
+  return weightedEvents[0]; // Fallback
+}
 
 // Get all tests (keeping existing endpoint)
 app.get('/api/tests', async (req, res) => {

@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node app.js",
-    "dev": "nodemon app.js"
+    "dev": "nodemon app.js",
+    "init-events": "node init-events.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import '../Resources/ResourceDisplay.css'
+import './ResourceDisplay.css'
 
-const ResourceDisplay = ({ userId }) => {
+const ResourceDisplay = ({ userId, onRef }) => {
   const [resources, setResources] = useState(null);
   const [stockedResources, setStockedResources] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lastHarvest, setLastHarvest] = useState(null);
+  const [activeEvent, setActiveEvent] = useState(null);
 
   const fetchGameState = async () => {
     try {
@@ -20,6 +21,7 @@ const ResourceDisplay = ({ userId }) => {
           energy: 0,
           metal: 0
         });
+        setActiveEvent(response.data.activeEvent || null);
       } else {
         console.error('Invalid game state response:', response.data);
         setResources({
@@ -47,15 +49,16 @@ const ResourceDisplay = ({ userId }) => {
         energy: 0,
         metal: 0
       });
-      setStockedResources({
-        oxygen: 0,
-        food: 0,
-        water: 0,
-        energy: 0,
-        metal: 0
-      });
-      setLoading(false);
-    }
+              setStockedResources({
+          oxygen: 0,
+          food: 0,
+          water: 0,
+          energy: 0,
+          metal: 0
+        });
+        setActiveEvent(null);
+        setLoading(false);
+      }
   };
 
   const harvestResources = async () => {
@@ -84,8 +87,13 @@ const ResourceDisplay = ({ userId }) => {
     // Auto-harvest every 30 seconds
     const interval = setInterval(harvestResources, 30000);
     
+    // Expose refresh function to parent
+    if (onRef) {
+      onRef({ refresh: fetchGameState });
+    }
+    
     return () => clearInterval(interval);
-  }, [userId]);
+  }, [userId, onRef]);
 
   if (loading) {
     return <div className="resource-display loading">Loading resources...</div>;
@@ -107,6 +115,16 @@ const ResourceDisplay = ({ userId }) => {
           🔄 Harvest
         </button>
       </div>
+      
+      {activeEvent && (
+        <div className="active-event-notification">
+          <div className="event-notification-header">
+            <span className="event-notification-icon">{activeEvent.icon}</span>
+            <span className="event-notification-name">{activeEvent.name}</span>
+          </div>
+          <div className="event-notification-message">{activeEvent.effects.message}</div>
+        </div>
+      )}
       
       <div className="resources-grid">
         {Object.entries(resources).map(([resource, amount]) => {

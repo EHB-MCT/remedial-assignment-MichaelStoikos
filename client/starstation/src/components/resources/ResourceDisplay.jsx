@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import './ResourceDisplay.css'
 
+/**
+ * ResourceDisplay Component
+ * 
+ * A React component that displays and manages resources in the space colony game.
+ * Shows current resources, stocked resources, and allows manual harvesting.
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.userId - The unique identifier of the current user
+ * @param {Function} props.onRef - Callback function to expose refresh functionality to parent component
+ * @returns {JSX.Element} The rendered resource display interface
+ */
 const ResourceDisplay = ({ userId, onRef }) => {
   const [resources, setResources] = useState(null);
   const [stockedResources, setStockedResources] = useState(null);
@@ -9,6 +20,15 @@ const ResourceDisplay = ({ userId, onRef }) => {
   const [lastHarvest, setLastHarvest] = useState(null);
   const [activeEvent, setActiveEvent] = useState(null);
 
+  /**
+   * Fetches the current game state for a given user from the backend API.
+   * 
+   * - Sends an HTTP GET request to the game API using the provided userId.
+   * - Updates resources, stocked resources, and active event state.
+   * - Sets fallback values if the response is invalid or missing data.
+   * - Handles errors gracefully with default resource values.
+   * - Sets loading state to false when complete.
+   */
   const fetchGameState = async () => {
     try {
       const response = await axios.get(`http://localhost:5000/api/game/${userId}`);
@@ -61,6 +81,15 @@ const ResourceDisplay = ({ userId, onRef }) => {
       }
   };
 
+  /**
+   * Harvests accumulated resources by sending a request to the backend API.
+   * 
+   * - Sends a POST request to the harvest API endpoint.
+   * - Updates the current resources with harvested amounts.
+   * - Resets stocked resources to zero after harvesting.
+   * - Displays harvest results for 3 seconds.
+   * - Handles errors gracefully with proper logging.
+   */
   const harvestResources = async () => {
     try {
       const response = await axios.post(`http://localhost:5000/api/game/${userId}/harvest`);
@@ -81,6 +110,14 @@ const ResourceDisplay = ({ userId, onRef }) => {
     }
   };
 
+  /**
+   * useEffect hook that initializes the component and sets up auto-harvesting.
+   * 
+   * - Fetches initial game state when component mounts.
+   * - Sets up automatic harvesting every 30 seconds.
+   * - Exposes refresh function to parent component via onRef callback.
+   * - Cleans up interval on component unmount.
+   */
   useEffect(() => {
     fetchGameState();
     

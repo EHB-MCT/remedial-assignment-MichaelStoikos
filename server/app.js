@@ -7,6 +7,20 @@ import bcrypt from 'bcryptjs';
 
 dotenv.config({ path: './config.env' });
 
+/**
+ * StarStation Server Application
+ * 
+ * Main Express.js server for the space colony resource management game.
+ * Handles authentication, game state management, building system, and space events.
+ * 
+ * Features:
+ * - User authentication (register/login) with bcrypt password hashing
+ * - Game state management with MongoDB
+ * - Resource harvesting and building construction
+ * - Dynamic space events system with production modifiers
+ * - Building definitions stored in database
+ */
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -15,7 +29,14 @@ const dbName = 'Resource-Management-Web';
 
 const client = new MongoClient(url);
 
-// Connect to MongoDB once when server starts
+/**
+ * MongoDB Connection Setup
+ * 
+ * - Connects to MongoDB Atlas cluster on server startup.
+ * - Uses connection string from environment variables.
+ * - Establishes single connection for all requests.
+ * - Logs connection status for debugging.
+ */
 client.connect()
   .then(() => console.log('✅ Connected to MongoDB'))
   .catch(err => console.error('❌ MongoDB connection error:', err));
@@ -23,18 +44,45 @@ client.connect()
 app.use(cors());
 app.use(express.json());
 
-// Simple password hashing function
+/**
+ * Password hashing utility function.
+ * 
+ * - Uses bcrypt with 10 salt rounds for security.
+ * - Returns hashed password for storage in database.
+ * 
+ * @param {string} password - Plain text password to hash
+ * @returns {Promise<string>} Hashed password
+ */
 const hashPassword = async (password) => {
   const saltRounds = 10;
   return await bcrypt.hash(password, saltRounds);
 };
 
-// Simple password verification function
+/**
+ * Password verification utility function.
+ * 
+ * - Compares plain text password with stored hash.
+ * - Uses bcrypt for secure comparison.
+ * 
+ * @param {string} password - Plain text password to verify
+ * @param {string} hashedPassword - Stored hashed password
+ * @returns {Promise<boolean>} True if password matches, false otherwise
+ */
 const verifyPassword = async (password, hashedPassword) => {
   return await bcrypt.compare(password, hashedPassword);
 };
 
-// Register new user
+/**
+ * User Registration Endpoint
+ * 
+ * - Creates new user account with hashed password.
+ * - Checks for existing username to prevent duplicates.
+ * - Initializes game state with default resources and habitat building.
+ * - Sets up event occurrence tracking for new users.
+ * 
+ * Route: POST /api/auth/register
+ * Body: { username: string, password: string }
+ */
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -95,7 +143,16 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Login user
+/**
+ * User Login Endpoint
+ * 
+ * - Authenticates user with username and password.
+ * - Verifies password hash using bcrypt.
+ * - Returns user ID and username on successful login.
+ * 
+ * Route: POST /api/auth/login
+ * Body: { username: string, password: string }
+ */
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -129,7 +186,17 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get user's game state
+/**
+ * Get Game State Endpoint
+ * 
+ * - Retrieves current game state for authenticated user.
+ * - Calculates stocked resources based on building production and time.
+ * - Applies active space event modifiers to production calculations.
+ * - Creates new game state if none exists for the user.
+ * 
+ * Route: GET /api/game/:userId
+ * Params: userId - User's unique identifier
+ */
 app.get('/api/game/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -220,7 +287,17 @@ app.get('/api/game/:userId', async (req, res) => {
   }
 });
 
-// Harvest resources from buildings
+/**
+ * Harvest Resources Endpoint
+ * 
+ * - Calculates and collects accumulated resources from all buildings.
+ * - Applies active space event modifiers to production.
+ * - Updates building last harvest timestamps.
+ * - Adds harvested resources to user's current resources.
+ * 
+ * Route: POST /api/game/:userId/harvest
+ * Params: userId - User's unique identifier
+ */
 app.post('/api/game/:userId/harvest', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -310,7 +387,18 @@ app.post('/api/game/:userId/harvest', async (req, res) => {
   }
 });
 
-// Build a new building
+/**
+ * Build Building Endpoint
+ * 
+ * - Constructs new buildings using available resources.
+ * - Validates resource costs against user's current resources.
+ * - Deducts required resources and adds building to game state.
+ * - Assigns random position coordinates for the new building.
+ * 
+ * Route: POST /api/game/:userId/build
+ * Params: userId - User's unique identifier
+ * Body: { buildingType: string }
+ */
 app.post('/api/game/:userId/build', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -389,7 +477,15 @@ app.post('/api/game/:userId/build', async (req, res) => {
   }
 });
 
-// Initialize buildings in database (run once)
+/**
+ * Initialize Buildings Endpoint
+ * 
+ * - Populates the buildings collection with predefined building types.
+ * - Sets up building costs, production rates, and descriptions.
+ * - Only runs once to prevent duplicate initialization.
+ * 
+ * Route: POST /api/init-buildings
+ */
 app.post('/api/init-buildings', async (req, res) => {
   try {
     const db = client.db(dbName);
@@ -474,7 +570,14 @@ app.post('/api/init-buildings', async (req, res) => {
   }
 });
 
-// Get all building types and their definitions
+/**
+ * Get Buildings Endpoint
+ * 
+ * - Retrieves all available building types and their definitions.
+ * - Returns building costs, production rates, and descriptions.
+ * 
+ * Route: GET /api/buildings
+ */
 app.get('/api/buildings', async (req, res) => {
   try {
     const db = client.db(dbName);
@@ -487,7 +590,15 @@ app.get('/api/buildings', async (req, res) => {
   }
 });
 
-// Initialize space events collection with predefined events
+/**
+ * Initialize Space Events Endpoint
+ * 
+ * - Populates the spaceEvents collection with predefined event types.
+ * - Sets up event effects, durations, cooldowns, and rarity weights.
+ * - Only runs once to prevent duplicate initialization.
+ * 
+ * Route: POST /api/init-events
+ */
 app.post('/api/init-events', async (req, res) => {
   try {
     const db = client.db(dbName);
@@ -586,7 +697,14 @@ app.post('/api/init-events', async (req, res) => {
   }
 });
 
-// Get all space event types
+/**
+ * Get Space Events Endpoint
+ * 
+ * - Retrieves all available space event types and their definitions.
+ * - Returns event effects, durations, cooldowns, and rarity information.
+ * 
+ * Route: GET /api/events
+ */
 app.get('/api/events', async (req, res) => {
   try {
     const db = client.db(dbName);
@@ -599,7 +717,17 @@ app.get('/api/events', async (req, res) => {
   }
 });
 
-// Trigger a random space event for a user
+/**
+ * Trigger Space Event Endpoint
+ * 
+ * - Randomly selects and activates a space event for the user.
+ * - Checks event cooldowns to prevent spam triggering.
+ * - Applies production modifiers based on event effects.
+ * - Updates game state with active event and cooldown tracking.
+ * 
+ * Route: POST /api/game/:userId/trigger-event
+ * Params: userId - User's unique identifier
+ */
 app.post('/api/game/:userId/trigger-event', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -692,7 +820,16 @@ app.post('/api/game/:userId/trigger-event', async (req, res) => {
   }
 });
 
-// Helper function to select random event based on rarity
+/**
+ * Helper function to select random event based on rarity weights.
+ * 
+ * - Applies weighted selection based on event rarity.
+ * - Common events have 50% chance, uncommon 30%, rare 20%.
+ * - Uses random number generation for fair selection.
+ * 
+ * @param {Array} events - Array of eligible events to choose from
+ * @returns {Object} Selected event object
+ */
 function selectRandomEvent(events) {
   const rarityWeights = {
     'common': 0.5,
@@ -718,7 +855,14 @@ function selectRandomEvent(events) {
   return weightedEvents[0]; // Fallback
 }
 
-// Get all tests (keeping existing endpoint)
+/**
+ * Get Tests Endpoint (Legacy)
+ * 
+ * - Keeps existing test endpoint for compatibility.
+ * - Returns all documents from tests collection.
+ * 
+ * Route: GET /api/tests
+ */
 app.get('/api/tests', async (req, res) => {
   try {
     const db = client.db(dbName);
@@ -729,6 +873,12 @@ app.get('/api/tests', async (req, res) => {
   }
 });
 
+/**
+ * Server Startup
+ * 
+ * - Starts Express server on configured port.
+ * - Logs server status and port information.
+ */
 app.listen(PORT, () => {
   console.log(`🚀 StarStation server running on port ${PORT}`);
 });

@@ -2,10 +2,18 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom'
 import axios from 'axios'
 import './App.css'
-import ResourceDisplay from './components/resources/ResourceDisplay'
-import BuildingsTab from './components/buildings/BuildingsTab'
+import ResourceDisplay from './components/Resources/ResourceDisplay'
+import BuildingsTab from './components/Buildings/BuildingsTab'
 import EventsDisplay from './components/events/EventsDisplay'
 
+/**
+ * App Component
+ * 
+ * Main React application component that handles authentication and routing.
+ * Manages user login/registration and renders the game interface when authenticated.
+ * 
+ * @returns {JSX.Element} The rendered application interface
+ */
 function App() {
   const [isLogin, setIsLogin] = useState(true)
   const [username, setUsername] = useState('')
@@ -14,7 +22,13 @@ function App() {
   const [error, setError] = useState('')
   const [user, setUser] = useState(null)
 
-  // Check if user is already logged in
+  /**
+   * useEffect hook that checks for existing user session on component mount.
+   * 
+   * - Retrieves saved user data from localStorage.
+   * - Automatically logs in user if valid session exists.
+   * - Runs only once when component mounts.
+   */
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
     if (savedUser) {
@@ -22,6 +36,18 @@ function App() {
     }
   }, [])
 
+  /**
+   * Handles form submission for both login and registration.
+   * 
+   * - Prevents default form submission behavior.
+   * - Sets loading state during API calls.
+   * - Sends request to appropriate endpoint (login or register).
+   * - Stores user data in localStorage on successful authentication.
+   * - Handles errors gracefully with user feedback.
+   * - Automatically logs in user after successful registration.
+   * 
+   * @param {Event} e - Form submission event
+   */
   const handleSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
@@ -58,6 +84,13 @@ function App() {
     }
   }
 
+  /**
+   * Logs out the current user and clears session data.
+   * 
+   * - Removes user from component state.
+   * - Clears user data from localStorage.
+   * - Returns user to login/register screen.
+   */
   const handleLogout = () => {
     setUser(null)
     localStorage.removeItem('user')
@@ -138,7 +171,17 @@ function App() {
   )
 }
 
-// Game Interface Component with Navigation
+/**
+ * GameInterface Component
+ * 
+ * Main game interface component that displays after user authentication.
+ * Provides navigation between different game sections (Resources, Buildings, Events).
+ * 
+ * @param {Object} props - Component props
+ * @param {Object} props.user - User object containing userId and username
+ * @param {Function} props.onLogout - Callback function to handle user logout
+ * @returns {JSX.Element} The rendered game interface with navigation
+ */
 const GameInterface = ({ user, onLogout }) => {
   const location = useLocation();
   const [resourceRefresh, setResourceRefresh] = useState(null);

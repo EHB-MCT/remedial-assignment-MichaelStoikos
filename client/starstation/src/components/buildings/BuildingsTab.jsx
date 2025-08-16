@@ -2,12 +2,31 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import '../buildings/BuildingsTab.css' 
 
+/**
+ * BuildingsTab Component
+ * 
+ * A React component that displays and manages buildings in the space colony game.
+ * Shows current owned buildings and available buildings that can be purchased.
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.userId - The unique identifier of the current user
+ * @param {Function} props.onResourcesUpdate - Callback function to notify parent component of resource changes
+ * @returns {JSX.Element} The rendered buildings tab interface
+ */
 const BuildingsTab = ({ userId, onResourcesUpdate }) => {
   const [gameState, setGameState] = useState(null);
   const [buildingTypes, setBuildingTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [buildingMessage, setBuildingMessage] = useState('');
 
+  /**
+   * Fetches the current game state for a given user from the backend API
+   * and updates the local component state.
+   *
+   * - Sends an HTTP GET request to the game API using the provided userId.
+   * - Updates the component's state with the response data.
+   * - Logs an error if the request fails (helpful for debugging).
+   */
   const fetchGameState = async () => {
     try {
       const response = await axios.get(`http://localhost:5000/api/game/${userId}`);
@@ -17,6 +36,15 @@ const BuildingsTab = ({ userId, onResourcesUpdate }) => {
     }
   };
 
+  /**
+   * Fetches all available building types from the backend API
+   * and updates the local component state with building definitions.
+   *
+   * - Sends an HTTP GET request to the buildings API endpoint.
+   * - Logs detailed information about each building for debugging purposes.
+   * - Updates the buildingTypes state with the retrieved data.
+   * - Handles errors gracefully with proper logging.
+   */
   const fetchBuildingTypes = async () => {
     try {
       const response = await axios.get('http://localhost:5000/api/buildings');
@@ -38,6 +66,14 @@ const BuildingsTab = ({ userId, onResourcesUpdate }) => {
     }
   };
 
+  /**
+   * useEffect hook that initializes the component by loading necessary data.
+   * 
+   * - Runs when the component mounts or when userId changes.
+   * - Sets loading state to true during data fetching.
+   * - Fetches both game state and building types concurrently using Promise.all.
+   * - Sets loading state to false once all data is loaded.
+   */
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
@@ -47,7 +83,18 @@ const BuildingsTab = ({ userId, onResourcesUpdate }) => {
     loadData();
   }, [userId]);
 
-  // Helper function to format production text
+  /**
+   * Helper function to format production information into human-readable text.
+   * 
+   * - Takes production data and production rate as parameters.
+   * - Filters out resources with zero production.
+   * - Formats the output with appropriate time units.
+   * - Handles edge cases like invalid or missing production data.
+   * 
+   * @param {Object} production - Object containing resource production amounts
+   * @param {number} productionRate - The time interval for production in seconds
+   * @returns {string} Formatted production string or fallback message
+   */
   const formatProduction = (production, productionRate) => {
     console.log('Formatting production:', production, 'Rate:', productionRate);
     
@@ -68,6 +115,18 @@ const BuildingsTab = ({ userId, onResourcesUpdate }) => {
     return formatted;
   };
 
+  /**
+   * Determines if the player can afford to build a specific building
+   * by checking if they have sufficient resources.
+   * 
+   * - Checks if gameState exists to avoid runtime errors.
+   * - Iterates through all required resources for the building.
+   * - Returns true only if ALL required resources are available.
+   * - Returns false if any resource is insufficient.
+   * 
+   * @param {Object} cost - Object containing resource costs for the building
+   * @returns {boolean} True if player can afford the building, false otherwise
+   */
   const canAfford = (cost) => {
     if (!gameState) return false;
     return Object.keys(cost).every(resource => 
@@ -75,11 +134,33 @@ const BuildingsTab = ({ userId, onResourcesUpdate }) => {
     );
   };
 
+  /**
+   * Counts how many buildings of a specific type the player currently owns.
+   * 
+   * - Safely accesses the buildings array from gameState.
+   * - Filters buildings by the specified type.
+   * - Returns the count of matching buildings.
+   * - Handles cases where buildings array might not exist.
+   * 
+   * @param {string} type - The type of building to count
+   * @returns {number} The number of buildings of the specified type owned by the player
+   */
   const getBuildingCount = (type) => {
     if (!gameState?.buildings) return 0;
     return gameState.buildings.filter(building => building.type === type).length;
   };
 
+  /**
+   * Attempts to build a new building by sending a request to the backend API.
+   * 
+   * - Sends a POST request to the build API endpoint with the building type.
+   * - Updates the local game state with the response from the server.
+   * - Displays success/error messages to the user.
+   * - Notifies the parent component about resource changes.
+   * - Automatically clears messages after a timeout for better UX.
+   * 
+   * @param {string} buildingType - The type of building to construct
+   */
   const buildBuilding = async (buildingType) => {
     try {
       console.log('Attempting to build:', buildingType);
